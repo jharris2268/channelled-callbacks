@@ -65,6 +65,11 @@ where
     }
 }
 
+
+fn as_secs(dur: std::time::Duration) -> f64 {
+    (dur.as_secs() as f64) * 1.0 + (dur.subsec_nanos() as f64) * 0.000000001
+}
+
 pub struct CallAll<
     T: CallFinish + ?Sized,
     U: Sync + Send + 'static,
@@ -109,9 +114,9 @@ where
     type ReturnType = Timings<V>;
 
     fn call(&mut self, c: U) {
-        let tx = ThreadTimer::new();
+        let tx = cpu_time::ThreadTime::now();
         let r = (self.callfunc)(c);
-        self.tm += tx.since();
+        self.tm += as_secs(tx.elapsed());
         self.out.call(r);
     }
 
