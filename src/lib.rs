@@ -1,8 +1,23 @@
+mod callfinish;
 mod callback;
-mod utils;
+mod callbackmerge;
+mod callbacksync;
 
-pub use callback::{CallFinish, Callback, CallbackMerge, CallbackSync};
-pub use utils::{MergeTimings, CallAll, ReplaceNoneWithTimings, Timings};
+mod mergetimings;
+mod callall;
+mod replacenonewithtimings;
+mod timings;
+
+pub use callfinish::{CallFinish,CollectResult};
+pub use callback::Callback;
+pub use callbackmerge::CallbackMerge;
+pub use callbacksync::CallbackSync;
+pub use mergetimings::MergeTimings;
+pub use callall::CallAll;
+pub use replacenonewithtimings::ReplaceNoneWithTimings;
+pub use timings::Timings;
+
+
 
 
 #[cfg(test)]
