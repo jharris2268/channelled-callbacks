@@ -28,7 +28,7 @@ fn call_all_sync<T: Send + 'static, U: Send + 'static>(
     }
 }
 
-static MAXNUMCHAN: usize = 8;
+static MAXNUMCHAN: usize = 32;
 
 pub struct CallbackSync<T, U> {
     send: Option<mpsc::SyncSender<T>>,

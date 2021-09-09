@@ -1,3 +1,11 @@
+//! Channelled Callbacks is a library for Rust to help to simplifiy concurrent programming involving
+//! streams of data. It is based on the
+//! [message-passing utilities](https://doc.rust-lang.org/stable/std/sync/mpsc/index.html)
+//! provided by Rust, but wrapped with data passed through callback functions.
+//!
+
+
+
 mod callfinish;
 mod callback;
 mod callbackmerge;
