@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Result};
+use std::io::Result;
 use std::sync::mpsc;
 use std::thread;
 
@@ -9,7 +9,7 @@ struct ReverseCallbackCallFinish<T> {
     
 }
 
-impl<T> CallFinish for Callback<T>
+impl<T> CallFinish for ReverseCallbackCallFinish<T>
 where
     T: Send + 'static,
     
@@ -33,7 +33,7 @@ where
 
 
 pub struct ReverseCallback<T, U> {
-    recv: Option<mpsc::Receiver<T>>,
+    recv: mpsc::Receiver<T>,
     result: Option<thread::JoinHandle<Result<U>>>,
 }
 
@@ -43,27 +43,27 @@ where
     T: Send + 'static,
     U: Send + 'static,
 {
-    pub fn new(caller: Fn(Box<impl CallFinish<CallType = T, ReturnType = ()>>) -> Result<U>) -> ReverseCallback<T, U> {
+    pub fn new<F: 'static + Fn(Box<dyn CallFinish<CallType = T, ReturnType = ()>>) -> Result<U>  + Send >(caller: F) -> ReverseCallback<T, U> {
         let (send, recv) = mpsc::sync_channel(1);
         
-        let cb = Box::new(ReverseCallbackCallFinish{send: send});
+        let cb = Box::new(ReverseCallbackCallFinish{send: Some(send)});
         
         let result = thread::spawn(move || caller(cb));
 
-        Callback {
-            recv: Some(recv),
+        ReverseCallback {
+            recv: recv,
             result: Some(result),
         }
     }
     
-    pub fn collect_result(&self) -> Result<U> {
-        self.result.join()
+    pub fn collect_result(&mut self) -> Result<U> {
+        self.result.take().unwrap().join().expect("!!")
     }
     
 }
 
 
-impl Iterator for ReverseCallback<T, U> 
+impl<T,U> Iterator for ReverseCallback<T, U> 
 where
     T: Send + 'static,
     U: Send + 'static,
@@ -71,7 +71,13 @@ where
     type Item = T;
     
     fn next(&mut self) -> Option<T> {
-        self.recv.recv()
+        match self.recv.recv() {
+            Ok(x) => Some(x),
+            Err(e) => {
+                println!("{:?}", e);
+                None
+            }
+        }
     }
 }
 
