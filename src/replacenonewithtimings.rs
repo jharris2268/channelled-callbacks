@@ -5,7 +5,9 @@ use std::io::Result;
 pub struct ReplaceNoneWithTimings<T: ?Sized> {
     out: Box<T>,
 }
-impl<T> ReplaceNoneWithTimings<T> {
+impl<T> ReplaceNoneWithTimings<T>
+where T: ?Sized
+{
     pub fn new(out: Box<T>) -> ReplaceNoneWithTimings<T> {
         ReplaceNoneWithTimings { out }
     }
