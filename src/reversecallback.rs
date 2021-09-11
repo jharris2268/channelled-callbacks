@@ -44,7 +44,7 @@ where
     T: Send + 'static,
     U: Sync + Send + 'static,
 {
-    pub fn new<F: 'static + Fn(Box<dyn CallFinish<CallType = T, ReturnType = Timings<U>>>) -> Result<Timings<U>>  + Send >(caller: F) -> ReverseCallback<T, U> {
+    pub fn new<F: 'static + FnOnce(Box<dyn CallFinish<CallType = T, ReturnType = Timings<U>>>) -> Result<Timings<U>>  + Send >(caller: F) -> ReverseCallback<T, U> {
         let (send, recv) = mpsc::sync_channel(1);
         
         let cb = Box::new(ReverseCallbackCallFinish{send: Some(send),p:std::marker::PhantomData});
