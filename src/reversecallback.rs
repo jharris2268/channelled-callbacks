@@ -62,8 +62,13 @@ where
         self.result.take().unwrap().join().expect("!!")
     }
     
+    
+    pub fn iter<'a>(&'a mut self) -> Box<dyn Iterator<Item=T> + 'a> {
+        Box::new(self.recv.iter())
+    }
+    
 }
-
+/*
 
 impl<T,U> Iterator for ReverseCallback<T, U> 
 where
@@ -83,5 +88,5 @@ where
     }
 }
 
-
+*/
 
