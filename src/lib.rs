@@ -16,6 +16,8 @@ mod callall;
 mod replacenonewithtimings;
 mod timings;
 
+mod reversecallback;
+
 pub use callfinish::{CallFinish,CollectResult};
 pub use callback::Callback;
 pub use callbackmerge::CallbackMerge;
@@ -24,7 +26,7 @@ pub use mergetimings::MergeTimings;
 pub use callall::CallAll;
 pub use replacenonewithtimings::ReplaceNoneWithTimings;
 pub use timings::Timings;
-
+pub use reversecallback::ReverseCallback;
 
 
 
