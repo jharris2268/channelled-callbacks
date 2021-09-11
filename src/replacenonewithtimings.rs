@@ -2,7 +2,7 @@ use crate::{CallFinish,Timings};
 use std::io::Result;
 
 
-pub struct ReplaceNoneWithTimings<T> {
+pub struct ReplaceNoneWithTimings<T: ?Sized> {
     out: Box<T>,
 }
 impl<T> ReplaceNoneWithTimings<T> {
@@ -13,7 +13,7 @@ impl<T> ReplaceNoneWithTimings<T> {
 
 impl<T, U> CallFinish for ReplaceNoneWithTimings<T>
 where
-    T: CallFinish<ReturnType = Option<Timings<U>>>,
+    T: CallFinish<ReturnType = Option<Timings<U>>> + ?Sized,
     U: Sync + Send + 'static,
 {
     type CallType = T::CallType;
