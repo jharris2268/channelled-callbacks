@@ -2,20 +2,20 @@ use std::io::Result;
 use std::sync::mpsc;
 use std::thread;
 
-use crate::CallFinish;
+use crate::{CallFinish,Timings};
 
-struct ReverseCallbackCallFinish<T> {
+struct ReverseCallbackCallFinish<T,U> {
     send: Option<mpsc::SyncSender<T>>,
-    
+    p: std::marker::PhantomData<U>
 }
 
-impl<T> CallFinish for ReverseCallbackCallFinish<T>
+impl<T,U> CallFinish for ReverseCallbackCallFinish<T,U>
 where
     T: Send + 'static,
-    
+    U: Sync + Send + 'static
 {
     type CallType = T;
-    type ReturnType = ();
+    type ReturnType = Timings<U>;
     fn call(&mut self, t: T) {
         match &self.send {
             Some(s) => {
@@ -25,38 +25,40 @@ where
         }
     }
 
-    fn finish(&mut self) -> Result<()> {
+    fn finish(&mut self) -> Result<Timings<U>> {
         self.send = None;
-        Ok(())
+        Ok(Timings::new())
     }
 }
 
 
-pub struct ReverseCallback<T, U> {
+pub struct ReverseCallback<T, U: Sync+Send+'static> {
     recv: mpsc::Receiver<T>,
-    result: Option<thread::JoinHandle<Result<U>>>,
+    result: Option<thread::JoinHandle<Result<Timings<U>>>>,
+    p: std::marker::PhantomData<U>
 }
 
 
 impl<T, U> ReverseCallback<T, U>
 where
     T: Send + 'static,
-    U: Send + 'static,
+    U: Sync + Send + 'static,
 {
-    pub fn new<F: 'static + Fn(Box<dyn CallFinish<CallType = T, ReturnType = ()>>) -> Result<U>  + Send >(caller: F) -> ReverseCallback<T, U> {
+    pub fn new<F: 'static + Fn(Box<dyn CallFinish<CallType = T, ReturnType = Timings<U>>>) -> Result<Timings<U>>  + Send >(caller: F) -> ReverseCallback<T, U> {
         let (send, recv) = mpsc::sync_channel(1);
         
-        let cb = Box::new(ReverseCallbackCallFinish{send: Some(send)});
+        let cb = Box::new(ReverseCallbackCallFinish{send: Some(send),p:std::marker::PhantomData});
         
         let result = thread::spawn(move || caller(cb));
 
         ReverseCallback {
             recv: recv,
             result: Some(result),
+            p:std::marker::PhantomData
         }
     }
     
-    pub fn collect_result(&mut self) -> Result<U> {
+    pub fn collect_result(&mut self) -> Result<Timings<U>> {
         self.result.take().unwrap().join().expect("!!")
     }
     
@@ -66,7 +68,7 @@ where
 impl<T,U> Iterator for ReverseCallback<T, U> 
 where
     T: Send + 'static,
-    U: Send + 'static,
+    U: Sync + Send + 'static,
 {
     type Item = T;
     
