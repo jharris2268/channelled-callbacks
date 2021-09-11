@@ -62,13 +62,13 @@ where
         self.result.take().unwrap().join().expect("!!")
     }
     
-    
+    /*
     pub fn iter<'a>(&'a mut self) -> Box<dyn Iterator<Item=T> + 'a> {
         Box::new(self.recv.iter())
-    }
+    }*/
     
 }
-/*
+
 
 impl<T,U> Iterator for ReverseCallback<T, U> 
 where
@@ -80,13 +80,14 @@ where
     fn next(&mut self) -> Option<T> {
         match self.recv.recv() {
             Ok(x) => Some(x),
-            Err(e) => {
-                println!("{:?}", e);
+            Err(_) => {
+                //println!("{:?}", e);
+                //only error is to indicate channel is closed...
                 None
             }
         }
     }
 }
 
-*/
+
 
