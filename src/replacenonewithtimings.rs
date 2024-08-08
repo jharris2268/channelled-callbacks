@@ -1,5 +1,5 @@
 use crate::{CallFinish,Timings};
-use std::io::Result;
+use crate::Result;
 
 
 pub struct ReplaceNoneWithTimings<T: ?Sized> {
@@ -13,19 +13,21 @@ where T: ?Sized
     }
 }
 
-impl<T, U> CallFinish for ReplaceNoneWithTimings<T>
+impl<T, U, E> CallFinish for ReplaceNoneWithTimings<T>
 where
-    T: CallFinish<ReturnType = Option<Timings<U>>> + ?Sized,
+    T: CallFinish<ReturnType = Option<Timings<U>>, ErrorType = E> + ?Sized,
     U: Sync + Send + 'static,
+    E: std::error::Error + Send + 'static
 {
     type CallType = T::CallType;
     type ReturnType = Timings<U>;
+    type ErrorType = E;
 
     fn call(&mut self, c: Self::CallType) {
         self.out.call(c);
     }
 
-    fn finish(&mut self) -> Result<Self::ReturnType> {
+    fn finish(&mut self) -> Result<Self::ReturnType, Self::ErrorType> {
         let x = self.out.finish()?;
         match x {
             None => Ok(Timings::new()),

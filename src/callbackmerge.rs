@@ -1,23 +1,24 @@
 
 use crate::{CallFinish,CollectResult};
-use std::io::{Error,Result};
+use crate::{Error,Result};
 
-pub struct CallbackMerge<T, U, V> {
-    callbacks: Vec<Box<dyn CallFinish<CallType = T, ReturnType = U>>>,
+pub struct CallbackMerge<T, U, V, E> {
+    callbacks: Vec<Box<dyn CallFinish<CallType = T, ReturnType = U, ErrorType = E>>>,
     collect: Box<dyn CollectResult<InType = U, OutType = V>>,
     idx: usize,
 }
 
-impl<T, U, V> CallbackMerge<T, U, V>
+impl<T, U, V, E> CallbackMerge<T, U, V, E>
 where
     T: Send + 'static,
     U: Send + 'static,
     V: Send + 'static,
+    E: std::error::Error + Send + 'static
 {
     pub fn new(
-        callbacks: Vec<Box<dyn CallFinish<CallType = T, ReturnType = U>>>,
+        callbacks: Vec<Box<dyn CallFinish<CallType = T, ReturnType = U, ErrorType = E>>>,
         collect: Box<dyn CollectResult<InType = U, OutType = V>>,
-    ) -> CallbackMerge<T, U, V> {
+    ) -> CallbackMerge<T, U, V, E> {
         CallbackMerge {
             callbacks: callbacks,
             collect: collect,
@@ -26,14 +27,16 @@ where
     }
 }
 
-impl<T, U, V> CallFinish for CallbackMerge<T, U, V>
+impl<T, U, V, E> CallFinish for CallbackMerge<T, U, V, E>
 where
     T: Send + 'static,
     U: Send + 'static,
     V: Send + 'static,
+    E: std::error::Error + Send + 'static
 {
     type CallType = T;
     type ReturnType = V;
+    type ErrorType = E;
 
     fn call(&mut self, t: T) {
         let l = self.callbacks.len();
@@ -41,9 +44,9 @@ where
         self.idx += 1;
     }
 
-    fn finish(&mut self) -> Result<Self::ReturnType> {
+    fn finish(&mut self) -> Result<Self::ReturnType, Self::ErrorType> {
         let mut r = Vec::new();
-        let mut err: Option<Error> = None;
+        let mut err: Option<Error<E>> = None;
         for c in self.callbacks.iter_mut() {
             match c.finish() {
                 Ok(s) => {

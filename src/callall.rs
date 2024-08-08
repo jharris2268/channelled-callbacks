@@ -1,6 +1,7 @@
 use crate::{CallFinish,Timings};
 use std::marker::PhantomData;
-use std::io::Result;
+
+use crate::{Result};
 use cpu_time::ThreadTime;
 
 
@@ -14,6 +15,7 @@ pub struct CallAll<
     U: Sync + Send + 'static,
     W: Fn(U) -> T::CallType,
     V,
+    E,
 > {
     out: Box<T>,
     tm: f64,
@@ -21,16 +23,17 @@ pub struct CallAll<
     callfunc: Box<W>,
     x: PhantomData<U>,
     y: PhantomData<V>,
+    z: PhantomData<E>
 }
 
-impl<T, U, W, V> CallAll<T, U, W, V>
+impl<T, U, W, V, E> CallAll<T, U, W, V, E>
 where
-    T: CallFinish<ReturnType = Timings<V>> + ?Sized,
+    T: CallFinish<ReturnType = Timings<V>, ErrorType = E> + ?Sized,
     U: Sync + Send + 'static,
     W: Fn(U) -> T::CallType + Sync + Send + 'static,
     V: Sync + Send + 'static,
 {
-    pub fn new(out: Box<T>, msg: &str, callfunc: Box<W>) -> CallAll<T, U, W, V> {
+    pub fn new(out: Box<T>, msg: &str, callfunc: Box<W>) -> CallAll<T, U, W, V, E> {
         CallAll {
             out: out,
             msg: String::from(msg),
@@ -38,19 +41,22 @@ where
             callfunc: callfunc,
             x: PhantomData,
             y: PhantomData,
+            z: PhantomData
         }
     }
 }
 
-impl<T, U, W, V> CallFinish for CallAll<T, U, W, V>
+impl<T, U, W, V, E> CallFinish for CallAll<T, U, W, V, E>
 where
-    T: CallFinish<ReturnType = Timings<V>> + ?Sized,
+    T: CallFinish<ReturnType = Timings<V>, ErrorType = E> + ?Sized,
     U: Sync + Send + 'static,
     W: Fn(U) -> T::CallType + Sync + Send + 'static,
     V: Sync + Send + 'static,
+    E: std::error::Error + Sync + Send + 'static
 {
     type CallType = U;
     type ReturnType = Timings<V>;
+    type ErrorType = E;
 
     fn call(&mut self, c: U) {
         let tx = ThreadTime::now();
@@ -59,9 +65,13 @@ where
         self.out.call(r);
     }
 
-    fn finish(&mut self) -> Result<Timings<V>> {
-        let mut t = self.out.finish()?;
-        t.add(self.msg.as_str(), self.tm);
-        Ok(t)
+    fn finish(&mut self) -> Result<Timings<V>, E> {
+        match self.out.finish() {
+            Ok(mut t) => {
+                t.add(self.msg.as_str(), self.tm);
+                Ok(t)
+            },
+            Err(e) => Err(e)
+        }
     }
 }

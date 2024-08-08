@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Result};
+use crate::{Error, Result};
 use std::sync::mpsc;
 use std::thread;
 
@@ -6,10 +6,10 @@ use crate::CallFinish;
 
 
 
-fn call_all_sync<T: Send + 'static, U: Send + 'static>(
+fn call_all_sync<T: Send + 'static, U: Send + 'static, E: std::error::Error+Send+'static>(
     recvs: Vec<mpsc::Receiver<T>>,
-    mut cf: Box<impl CallFinish<CallType = T, ReturnType = U> + ?Sized>,
-) -> Result<U> {
+    mut cf: Box<impl CallFinish<CallType = T, ReturnType = U, ErrorType = E> + ?Sized>,
+) -> Result<U, E> {
     let mut i = 0;
     let l = recvs.len();
     let mut nf = 0;
@@ -30,22 +30,23 @@ fn call_all_sync<T: Send + 'static, U: Send + 'static>(
 
 static MAXNUMCHAN: usize = 32;
 
-pub struct CallbackSync<T, U> {
+pub struct CallbackSync<T, U,E: std::error::Error + Send + 'static> {
     send: Option<mpsc::SyncSender<T>>,
-    result: Option<thread::JoinHandle<Result<U>>>,
+    result: Option<thread::JoinHandle<Result<U,E>>>,
     expectresult: bool,
     //th: usize
 }
 
-impl<T, U> CallbackSync<T, U>
+impl<T, U, E> CallbackSync<T, U, E>
 where
     T: Send + 'static,
     U: Send + 'static,
+    E: std::error::Error + Send + 'static
 {
     pub fn new(
-        cf: Box<impl CallFinish<CallType = T, ReturnType = U> + ?Sized>,
+        cf: Box<impl CallFinish<CallType = T, ReturnType = U, ErrorType = E> + ?Sized>,
         numchan: usize,
-    ) -> Vec<Box<CallbackSync<T, U>>> {
+    ) -> Vec<Box<CallbackSync<T, U, E>>> {
         if numchan == 0 || numchan > MAXNUMCHAN {
             panic!(
                 "wrong numchan {}: must between 1 and {}",
@@ -82,13 +83,15 @@ where
     }
 }
 
-impl<T, U> CallFinish for CallbackSync<T, U>
+impl<T, U, E> CallFinish for CallbackSync<T, U, E>
 where
     T: Send + 'static,
     U: Send + 'static,
+    E: std::error::Error + Send + 'static
 {
     type CallType = T;
     type ReturnType = Option<U>;
+    type ErrorType = E;
 
     fn call(&mut self, t: T) {
         match &self.send {
@@ -99,7 +102,7 @@ where
         }
     }
 
-    fn finish(&mut self) -> Result<Option<U>> {
+    fn finish(&mut self) -> Result<Option<U>,E> {
         self.send = None;
 
         if !self.expectresult {
@@ -115,12 +118,11 @@ where
 
                     Err(e) => Err(e),
                 },
-                Err(e) => Err(Error::new(
-                    ErrorKind::Other,
+                Err(e) => Err(Error::ChannelledCallbackError(
                     format!("failed to join {:?}", e),
                 )),
             },
-            None => Err(Error::new(ErrorKind::Other, "already called finish")),
+            None => Err(Error::ChannelledCallbackError("already called finish".to_string())),
         }
     }
 }

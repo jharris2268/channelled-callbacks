@@ -1,11 +1,14 @@
-use std::io::Result;
+use crate::Result;
 
 
 pub trait CallFinish: Sync + Send + 'static {
     type CallType;
     type ReturnType;
+    type ErrorType : std::error::Error + Send + 'static;
+   
+
     fn call(&mut self, f: Self::CallType);
-    fn finish(&mut self) -> Result<Self::ReturnType>;
+    fn finish(&mut self) -> Result<Self::ReturnType, Self::ErrorType>;
 }
 
 

@@ -1,21 +1,25 @@
-use std::io::Result;
+use crate::Result;
 use std::sync::mpsc;
 use std::thread;
 
 use crate::{CallFinish,Timings};
 
-struct ReverseCallbackCallFinish<T,U> {
+struct ReverseCallbackCallFinish<T,U,E> {
     send: Option<mpsc::SyncSender<T>>,
-    p: std::marker::PhantomData<U>
+    p: std::marker::PhantomData<U>,
+    z: std::marker::PhantomData<E>
 }
 
-impl<T,U> CallFinish for ReverseCallbackCallFinish<T,U>
+impl<T,U,E> CallFinish for ReverseCallbackCallFinish<T,U,E>
 where
     T: Send + 'static,
-    U: Sync + Send + 'static
+    U: Sync + Send + 'static, 
+    E: std::error::Error + Sync + Send + 'static
 {
     type CallType = T;
     type ReturnType = Timings<U>;
+    type ErrorType = E;
+    
     fn call(&mut self, t: T) {
         match &self.send {
             Some(s) => {
@@ -25,41 +29,46 @@ where
         }
     }
 
-    fn finish(&mut self) -> Result<Timings<U>> {
+    fn finish(&mut self) -> Result<Timings<U>, E> {
         self.send = None;
         Ok(Timings::new())
     }
 }
 
 
-pub struct ReverseCallback<T, U: Sync+Send+'static> {
+pub struct ReverseCallback<T, U: Sync+Send+'static, E: std::error::Error + Sync + Send + 'static > {
     recv: mpsc::Receiver<T>,
-    result: Option<thread::JoinHandle<Result<Timings<U>>>>,
+    result: Option<thread::JoinHandle<std::result::Result<Timings<U>, E>>>,
     p: std::marker::PhantomData<U>
 }
 
 
-impl<T, U> ReverseCallback<T, U>
+impl<T, U, E> ReverseCallback<T, U, E>
 where
     T: Send + 'static,
     U: Sync + Send + 'static,
+    E: std::error::Error + Sync + Send + 'static
 {
-    pub fn new<F: 'static + FnOnce(Box<dyn CallFinish<CallType = T, ReturnType = Timings<U>>>) -> Result<Timings<U>>  + Send >(caller: F) -> ReverseCallback<T, U> {
+    pub fn new<F: 'static + FnOnce(Box<dyn CallFinish<CallType = T, ReturnType = Timings<U>, ErrorType = E>>) -> std::result::Result<Timings<U>, E>  + Send >(caller: F) -> ReverseCallback<T, U, E> {
         let (send, recv) = mpsc::sync_channel(1);
         
-        let cb = Box::new(ReverseCallbackCallFinish{send: Some(send),p:std::marker::PhantomData});
+        let cb = Box::new(ReverseCallbackCallFinish{
+                send: Some(send),
+                p: std::marker::PhantomData,
+                z: std::marker::PhantomData
+            });
         
         let result = thread::spawn(move || caller(cb));
 
         ReverseCallback {
             recv: recv,
             result: Some(result),
-            p:std::marker::PhantomData
+            p: std::marker::PhantomData
         }
     }
     
-    pub fn collect_result(&mut self) -> Result<Timings<U>> {
-        self.result.take().unwrap().join().expect("!!")
+    pub fn collect_result(&mut self) -> Result<Timings<U>, E> {
+        Ok(self.result.take().unwrap().join().expect("!!")?)
     }
     
     /*
@@ -70,10 +79,11 @@ where
 }
 
 
-impl<T,U> Iterator for ReverseCallback<T, U> 
+impl<T,U, E> Iterator for ReverseCallback<T, U, E> 
 where
     T: Send + 'static,
     U: Sync + Send + 'static,
+    E: std::error::Error + Sync + Send + 'static
 {
     type Item = T;
     
